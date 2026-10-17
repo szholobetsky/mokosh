@@ -2,126 +2,112 @@
 
 # mokosh
 
-**The dataset a code-search study starts from.** mokosh reads the commits of a git repository,
-finds the task each commit belongs to (`PROJ-123 fix login`), fetches those tasks from the
-tracker — Jira, GitHub, GitLab or YouTrack — and writes both into one SQLite database:
+Dataset collector for software projects — gathers the commits of a git repository and the tasks of its issue tracker (Jira, GitHub, GitLab, YouTrack) into one SQLite database, linked task by task, without a GPU or an LLM.
 
-- `TASK` — `NAME`, `TITLE`, `DESCRIPTION`, `COMMENTS`, in plain text (Jira ADF trees and wiki
-  markup are converted);
-- `COMMIT` — one row per (commit, file): `SHA`, author, `CMT_DATE`, `MESSAGE`, `PATH`, `DIFF`,
-  `TASK_NAME`, `CHANGE_TYPE` — what the commit did to the file: `A` added, `M` modified,
-  `D` deleted, `R` renamed (`PATH` is the new name). A database made before `CHANGE_TYPE` gets the
-  column on the next `mokosh ingest`, filled from `git log --name-status` of the repository.
-  `DIFF` is the patch parent → commit: a line the commit added starts with `+`.
+## What it does
 
-mokosh before 2026-10-10 wrote `DIFF` the other way round (commit → parent: added lines with `-`).
-`mokosh ingest` turns such a database the right way before it adds anything; for a database that is
-not ingested again, `mokosh fixdiff <db> --repo <repo>` does the same. Either runs once — the
-database is marked (`MOKOSH_META`) — and leaves the root commits alone (their patch against the
-empty tree was already right).
+mokosh reads the commits of a repository, finds the task each commit belongs to from its message
+(`PROJ-123 fix login`), fetches those tasks from the tracker and writes both into one database:
 
-Everything else in the toolkit reads that database: **simargl** embeds the tasks, **gamayun**
-builds an ontology from them, **1bcoder** exports them for a glossary. mokosh is the only one
-that writes it. No GPU, no LLM, no embeddings: git, HTTP and SQLite.
+- **tasks** — key, title, description and comments, as plain text (tracker markup such as Jira's
+  ADF and wiki syntax is converted);
+- **commits** — one row per changed file: commit, author, date, message, path, diff, the task it
+  belongs to, and what happened to the file (added, modified, deleted, renamed).
+
+Around that it offers:
+
+- **init** — a setup wizard: repository, branch, tracker, and how task keys appear in commit
+  messages, with every option tried on the repository's recent commits;
+- **ingest** — incremental and resumable: a second run adds only what is new, and an interrupted
+  fetch continues where it stopped;
+- **status** — what a database holds;
+- **export** — the tasks and commits as plain text files, for tools that read folders;
+- **ui** — the same in the browser.
+
+---
+
+## Statement of need
+
+Research on mining software repositories and task-to-code retrieval starts from the same dataset:
+tasks with their text, and the files each task changed. Building it means walking the git history,
+recognising task keys in commit messages, calling the tracker's API page by page, cleaning its
+markup and keeping it all consistent when the project moves on. Each study tends to write its own
+scripts for this, and their datasets are hard to rebuild or extend.
+
+mokosh does this once, for four trackers, into one documented SQLite layout. It is meant for:
+
+- **researchers** who need a reproducible task–commit dataset of a real project, and want to
+  refresh it later without starting over;
+- **developers and tool builders** who want their project's history in a form that other tools
+  can search: [simargl](https://pypi.org/project/simargl/) (semantic search over past tasks) and
+  [gamayun-ontology](https://pypi.org/project/gamayun-ontology/) (a statistical ontology of the
+  history) both read mokosh databases.
+
+---
 
 ## Install
 
-```
-pip install mokosh               # gitpython, requests, beautifulsoup4, pyyaml, tqdm, flask, waitress
-pip install mokosh[selenium]     # only for Jira instances that need a real browser
+```bash
+pip install mokosh
+pip install "mokosh[selenium]"     # only for Jira instances that need a real browser
 ```
 
-simargl and gamayun depend on it, so installing either of them installs mokosh too.
+Python 3.10+. Dependencies: gitpython, requests, beautifulsoup4, pyyaml, tqdm, Flask, waitress.
 
-## Use
+---
 
-```
-cd C:\Projects\Data\sonarqube
+## Quick start
+
+```bash
+cd my-project                    # a git clone
 mokosh init                      # repository, branch, history since, tracker -> .mokosh/project.yaml
-mokosh ingest                    # [1/2] commits   [2/2] task keys from messages + task details
-mokosh status                    # tasks, commits, how many are linked to a task, date range
+mokosh ingest                    # [1/2] commits   [2/2] task keys + task details -> units.db
+mokosh status                    # tasks, commits, how many are linked, date range
 ```
 
-`ingest` is incremental. Run it again a month later and it adds only the commits whose SHA is not
-in the database yet (new rows get IDs after the existing ones; old rows are never touched), links
-only the commits that have no task yet, and asks the tracker only about the tasks that have no
-details yet — so each task is fetched once, and a failed one is tried again on the next run. The
-same makes an interrupted fetch of ten thousand tasks continue where it stopped. An empty answer of the
-tracker (404, no access, a rate limit, a wrong owner/repo) is not stored as a task with no text: the
-task stays unfetched and is asked again next time, and when the first 20 tasks all come back empty
-the fetch stops and says which settings to check. What each run
-added is kept in `.mokosh/ingest_state.yaml`. `--phase git|tasks` runs one phase; `--force`
-links every commit to a task key again (after a change of `commit_mask`). History rewritten
-upstream (rebase, force push) leaves the old commits in the database and adds the new ones.
-Tokens never go into the file. `mokosh init` (and the Setup page of `mokosh ui`) put the token you enter into an
-environment variable — `GITHUB_TOKEN`, `JIRA_TOKEN`, `GITLAB_TOKEN`, `YOUTRACK_TOKEN`, or
-`MOKOSH_<PROJECT>_GITHUB_TOKEN` when the plain name already holds another token — and project.yaml keeps
-only `github_token: ${GITHUB_TOKEN}`. On Windows the variable is saved for your user (`setx`; mokosh also
-reads it from there in a terminal opened before); elsewhere init prints the `export` line for your shell
-profile.
+A month later, `mokosh ingest` again adds only the new commits and the tasks not fetched yet.
 
-A monthly refresh is two commands; gamayun rebuilds from scratch in minutes:
+The database is ready for the other tools:
 
-```
-mokosh ingest
-gamayun index --db units.db --repo . --project sonar
-```
-
-Then build on it:
-
-```
+```bash
 simargl index units units.db                              # semantic search over the tasks
-gamayun index --db units.db --repo . --project sonar      # statistical ontology
+gamayun index --db units.db --repo . --project myproj     # statistical ontology
 ```
 
-Other commands:
+---
 
-```
-mokosh plaintext units.db [--dry-run]     # clean tracker markup in a database from an older ingest
-mokosh export units.db --out DIR          # the rows as text files, for /flow glossary (see below)
-```
+## Commands
 
-A folder set up earlier with `simargl init` (`.simargl/project.yaml`) is used as it is — no new
-`init`, no ingest from scratch. (simargl no longer gathers anything: it only reads the database.)
+| Command | What it does |
+|---|---|
+| `mokosh init` | Setup wizard; writes `.mokosh/project.yaml` |
+| `mokosh ingest [--phase git\|tasks] [--force]` | Commits, then task keys and task details; only what is new |
+| `mokosh status [DB]` | What the database holds |
+| `mokosh export DB --out DIR` | Tasks and commits as text files (see [Export](#export)) |
+| `mokosh plaintext DB [--dry-run]` | Convert tracker markup to plain text in a database from an older ingest |
+| `mokosh fixdiff DB --repo REPO` | Fix the diff direction in a database written by mokosh before 2026-10-10 (`ingest` does it on its own) |
+| `mokosh ui [--port 8093] [--host 0.0.0.0] [--root FOLDER]` | The web UI |
 
-### Web UI
+`--force` links every commit to a task key again, for example after changing `commit_mask`.
 
-```
-mokosh ui                        # http://127.0.0.1:8093/   (--port, --host 0.0.0.0, --root FOLDER)
-```
+---
 
-Flask + waitress, like the other tools of the toolkit (eight themes, six languages):
+## The database
 
-- **Setup** — the form `mokosh init` asks for: folder, database, repository and branch, tracker,
-  the commit mask with every preset tried on the repository's last 300 commits. A token goes to an
-  environment variable, as with `mokosh init`.
-- **Ingest** — `mokosh ingest` (both phases, or git / tasks only; `--force`) with its log.
-- **Status** — what the database holds, `project.yaml` (tokens masked), `ingest_state.yaml`.
+| Table | Columns |
+|---|---|
+| `TASK` | `ID`, `NAME` (the task key), `TITLE`, `DESCRIPTION`, `COMMENTS` |
+| `COMMIT` | `ID`, `SHA`, `AUTHOR_NAME`, `AUTHOR_EMAIL`, `CMT_DATE`, `MESSAGE`, `PATH`, `DIFF`, `TASK_NAME`, `CHANGE_TYPE` |
 
-Projects are the folders with `.mokosh/project.yaml` (or an earlier `.simargl/project.yaml`) under
-the folder it was started in, and those remembered in `~/.mokosh/projects.json` (`mokosh init`
-and the UI remember them).
+`COMMIT` has one row per (commit, file). `TASK_NAME` links it to `TASK.NAME`. `CHANGE_TYPE` is
+`A` added, `M` modified, `D` deleted or `R` renamed (`PATH` is then the new name). `DIFF` is the
+patch from the parent to the commit, so an added line starts with `+`.
 
-### Export for a glossary
+Without a tracker mokosh stores the commits only, and `TASK` stays empty.
 
-`/flow glossary` (1bcoder, vyrii) reads folders of text files, never SQLite; `mokosh export` writes
-them:
+---
 
-```
-mokosh export units.db --out DIR              # --all (default): DIR/tasks/ and DIR/commits/ apart
-mokosh export units.db --out DIR --join       # one file per task with its commits (DIR/joined/)
-mokosh export units.db --out DIR --task       # tasks only      (--commits: commits only)
-mokosh export units.db --out DIR --level title      # TITLE | desc: + DESCRIPTION (default) | comments: + COMMENTS
-mokosh export units.db --out DIR --diff-mode full   # the whole stored diff (default changed: only @/+/- lines)
-```
-
-`--join` writes each commit as its own `--- commit <sha> ---` block (message + per-file diff); a
-task with no commit still gets its file, and commits with no task are counted, not guessed at.
-`--all` keeps tasks and commit diffs as separate corpora, to be indexed as separate glossary
-projects. `desc` is the default level: title + description beat title alone and the noisier
-+comments in the retrieval experiments; `changed` drops the untouched context lines of a diff.
-
-### Trackers
+## Trackers
 
 | `source` | Settings in `tasks:` |
 |---|---|
@@ -130,49 +116,143 @@ projects. `desc` is the default level: title + description beat title alone and 
 | `gitlab` | `gitlab_url`, `gitlab_project`, `gitlab_token` |
 | `youtrack` | `youtrack_url`, `youtrack_project`, `youtrack_token` |
 
+**Tokens never go into the file.** `mokosh init` (and the Setup page of the UI) puts the token you
+enter into an environment variable (`GITHUB_TOKEN`, `JIRA_TOKEN`, `GITLAB_TOKEN`,
+`YOUTRACK_TOKEN`, or `MOKOSH_<PROJECT>_GITHUB_TOKEN` when the plain name already holds another
+token), and `project.yaml` keeps only `github_token: ${GITHUB_TOKEN}`. On Windows the variable is
+saved for your user (`setx`); elsewhere `init` prints the `export` line for your shell profile.
+
+### Task keys in commit messages
+
 How a task key is found in a commit message is `commit_mask` in `tasks:`, for any tracker:
 
 | `commit_mask` | Finds |
 |---|---|
-| `simple` (default) | `KAFKA-123` at the start of the message |
-| `bracketed` | `[KAFKA-123]` anywhere |
+| `simple` (default) | `PROJ-123` at the start of the message |
+| `bracketed` | `[PROJ-123]` anywhere |
 | `django` | `Fixed #123` |
 | `generic` | `fixes #123`, `closed: #123`, `resolves #123` |
 | `broad` | any `#123` |
-| `regex-key` | the project's own key anywhere, as a whole word: `Fixed: invoice total (OFBIZ-12345)`. Built from `jira_project` (or `youtrack_project`); a team that uses the keys of several projects writes them all: `jira_project: ABC,ABD,ABK` |
+| `regex-key` | the project's own key anywhere, as a whole word: `Fixed: invoice total (SHOP-12345)`. Built from `jira_project` (or `youtrack_project`); for several projects list them all: `jira_project: ABC,ABD,ABK` |
 | any regex | your own pattern; the first group is the key, if there is one |
 
-Own regexes, for example:
+Examples of your own patterns:
 
 | regex | finds |
 |---|---|
-| `(OFBIZ-\d+)` | one project's key anywhere |
+| `(SHOP-\d+)` | one project's key anywhere |
 | `((?:ABC\|ABD\|ABK)-\d+)` | the keys of several projects anywhere |
 | `\b((?:ABC\|ABD\|ABK)-\d+)\b` | the same, not inside a longer word (`XABC-1`) — what `regex-key` builds |
 
-A pattern like `([A-Z]+-\d+)` (any key) also catches `UTF-8`, `SHA-256`, `ISO-8859`; name the keys.
+A pattern like `([A-Z]+-\d+)` (any key) also catches `UTF-8`, `SHA-256`, `ISO-8859`, so name the
+keys instead.
 
-`mokosh init` asks for it with any tracker. It prints this table, then tries every mask on the repository's
-last 300 commits and offers the one that links the most:
+`mokosh init` tries every mask on the repository's last 300 commits and offers the one that links
+the most:
 
 ```
-On the last 300 commits of C:/Projects/Data/flink:
+On the last 300 commits of ./my-project:
   simple     links    0 (0%)   -
-  bracketed  links  282 (94%)   FLINK-40293, FLINK-38262, FLINK-40830
+  bracketed  links  282 (94%)   PROJ-4029, PROJ-3826, PROJ-4083
   ...
 Commit mask [Enter = bracketed]:
 ```
 
-`mokosh ui` (**Setup**) shows the same table and the same counts.
+---
 
-Without a tracker mokosh stores the commits only (`TASK` stays empty); simargl can still index
-them as commit units.
+## Updating a dataset
 
-### Table names
+`ingest` is incremental:
 
-New databases have singular `TASK` and `COMMIT`. Older simargl ingests have `TASKS` / `COMMITS`,
-and the codeXtract datasets (`sonar.db`, `flink.db`) mix them; `mokosh.schema` resolves whatever a
-file has, and simargl and gamayun read through it.
+- it adds only the commits not in the database yet; existing rows are never changed;
+- it links only the commits that have no task yet;
+- it asks the tracker only about the tasks with no details yet, so each task is fetched once.
+
+An interrupted fetch therefore continues where it stopped. An empty answer from the tracker (404,
+no access, a rate limit, a wrong owner/repo) is not stored: the task is asked again next time, and
+if the first 20 tasks all come back empty the fetch stops and says which settings to check. What
+each run added is kept in `.mokosh/ingest_state.yaml`. History rewritten upstream (rebase, force
+push) keeps the old commits and adds the new ones.
+
+---
+
+## Web UI
+
+```bash
+mokosh ui                        # http://127.0.0.1:8093/
+```
+
+- **Setup:** the form `mokosh init` asks for, with every commit mask tried on the repository's
+  last 300 commits.
+- **Ingest:** runs `mokosh ingest` (both phases, or git / tasks only) and shows its log.
+- **Status:** what the database holds, `project.yaml` (tokens masked) and `ingest_state.yaml`.
+
+The UI lists the projects under the folder it was started in and those remembered in
+`~/.mokosh/projects.json`. It has 8 colour themes and 6 languages (English, Ukrainian, German,
+French, Spanish, Portuguese).
+
+---
+
+## Export
+
+Some tools read folders of text files rather than SQLite (for example `/flow glossary` in
+[1bcoder](https://pypi.org/project/1bcoder/)). `mokosh export` writes them:
+
+```bash
+mokosh export units.db --out DIR                    # DIR/tasks/ and DIR/commits/ (default: --all)
+mokosh export units.db --out DIR --join             # one file per task with its commits (DIR/joined/)
+mokosh export units.db --out DIR --task             # tasks only   (--commits: commits only)
+mokosh export units.db --out DIR --level title      # title only | desc: + description (default) | comments: + comments
+mokosh export units.db --out DIR --diff-mode full   # the whole diff (default changed: only the changed lines)
+```
+
+With `--join`, each commit is its own `--- commit <sha> ---` block (message and per-file diff). A
+task with no commit still gets its file; commits with no task are counted, not guessed at.
+
+---
+
+## Python API
+
+The database is plain SQLite, so it can be read with `sqlite3` directly. `mokosh.schema` gives
+the table names as the file has them, already quoted:
+
+```python
+import sqlite3
+from mokosh import schema
+
+con = sqlite3.connect("units.db")
+task_t, commit_t = schema.tables(con)
+
+rows = con.execute(f"""
+    SELECT T.NAME, T.TITLE, C.PATH
+    FROM {task_t} T JOIN {commit_t} C ON C.TASK_NAME = T.NAME
+""").fetchall()
+```
+
+Export from Python:
+
+```python
+from mokosh.exporter import export_units
+
+export_units("units.db", "out", mode="join", level="desc", diff_mode="changed")
+```
+
+---
+
+## Tests
+
+```bash
+git clone https://github.com/szholobetsky/mokosh
+cd mokosh
+pip install -e ".[dev]"
+pytest
+```
+
+## Support
+
+The project is on GitHub: [github.com/szholobetsky/mokosh](https://github.com/szholobetsky/mokosh).
+Questions, bug reports and suggestions go to its
+[issues](https://github.com/szholobetsky/mokosh/issues).
 
 ---
 
@@ -209,6 +289,10 @@ Together they cover the full development loop: gather the history, understand th
 The name comes from Slavic mythology. Mokosh (Мокош) is the goddess of the harvest and of spinning: she spins the threads of fate and watches over the yield of the land. A fitting name for the tool that spins tasks and commits into one yarn — no good ingest, no harvest.
 
 ---
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## About
 

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mokosh"
+version = "0.1.0"
+description = "Gathers the dataset a code-search study starts from: the commits of a git repository and the tasks of its tracker (Jira, GitHub, GitLab, YouTrack) in one SQLite database. No GPU, no LLM."
+requires-python = ">=3.10"
+readme = {file = "README.md", content-type = "text/markdown"}
+dependencies = [
+    "gitpython>=3.1",
+    "requests>=2.28",
+    "beautifulsoup4>=4.12",
+    "pyyaml>=6.0",
+    "tqdm>=4.60",
+    "flask>=2.3",                # mokosh ui — Flask + waitress only, so a phone install works
+    "waitress>=2.1",
+]
+
+[project.optional-dependencies]
+selenium = ["selenium>=4.0"]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage   = "https://github.com/szholobetsky/mokosh"
+Repository = "https://github.com/szholobetsky/mokosh"
+
+[project.scripts]
+mokosh = "mokosh.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mokosh*"]
+
+[tool.setuptools.package-data]
+"mokosh.ui" = ["webui/*", "webui/lang/*", "webui/themes/*"]

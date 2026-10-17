@@ -1,0 +1,19 @@
+/* Beach — turquoise sea, aquamarine shallows — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: light;
+  --bg:          #F0FDFC;
+  --panel:       #CCFBF1;
+  --text:        #042F2E;
+  --dim:         #0F766E;
+  --line:        #99F6E4;
+  --accent:      #0E7490;
+  --on-accent:   #ffffff;
+  --accent-soft: color-mix(in oklab, #0E7490 16%, #CCFBF1);
+  --code:        color-mix(in oklab, #042F2E 7%, #F0FDFC);
+  --pos:         #1f7a3f;
+  --neg:         #e11d48;
+  /* charts: the light steps of the validated palette */
+  --z-evolution: #2a78d6; --z-maintenance: #eb6834; --z-disruption: #1baf7a; --z-stagnation: #eda100;
+  --k-history: #eb6834; --k-code: #1baf7a;
+  --grid: #e1e0d9; --axis: #c3c2b7;
+}

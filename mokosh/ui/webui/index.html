@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mokosh</title>
+<link rel="stylesheet" href="/ui/style.css">
+<link rel="stylesheet" id="theme-link" disabled>
+<script>
+  // the theme before the first paint: no flash of the default colours
+  (function () {
+    var t = '';
+    try { t = localStorage.getItem('mokosh-theme') || ''; } catch (e) {}
+    var q = new URLSearchParams(location.search).get('theme');
+    if (q !== null) { t = q === 'mokosh' ? '' : q; try { localStorage.setItem('mokosh-theme', t); } catch (e) {} }
+    if (t) { var l = document.getElementById('theme-link'); l.href = '/ui/themes/' + t + '.css'; l.disabled = false;
+             document.documentElement.setAttribute('data-theme', t); }
+  })();
+</script>
+<script src="/ui/i18n.js"></script>
+<script src="/ui/lang/en.js"></script>
+<script src="/ui/lang/uk.js"></script>
+<script src="/ui/lang/de.js"></script>
+<script src="/ui/lang/fr.js"></script>
+<script src="/ui/lang/es.js"></script>
+<script src="/ui/lang/pt.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">🧶</span> Mokosh <small data-i18n="tagline">gathers the dataset: commits + tracker tasks → SQLite</small></div>
+  <nav>
+    <button class="tab active" data-tab="setup" data-i18n="tab_setup">Setup</button>
+    <button class="tab" data-tab="ingest" data-i18n="tab_ingest">Ingest</button>
+    <button class="tab" data-tab="status" data-i18n="tab_status">Status</button>
+  </nav>
+  <select id="project" data-i18n-title="project_title"></select>
+  <select id="theme" data-i18n-title="theme_title"></select>
+  <select id="lang" data-i18n-title="lang_title"></select>
+  <button id="refresh" class="small" data-i18n-title="refresh_title">⟳</button>
+</header>
+<div id="scope" class="scope dim"></div>
+
+<main>
+  <!-- SETUP (project.yaml) -->
+  <section id="tab-setup" class="panel active">
+    <p class="dim" data-i18n-html="init_intro"></p>
+    <div class="params">
+      <label style="grid-column: span 2"><span data-i18n="init_folder">project folder</span><input id="n-folder" data-i18n-ph="init_folder_ph"></label>
+      <label><span data-i18n="init_name">name</span><input id="n-name"></label>
+      <label><span data-i18n="init_db">database file</span><input id="n-db" value="units.db"></label>
+      <label><span data-i18n="init_repo">git repository</span><input id="n-repo" value="."></label>
+      <label><span data-i18n="init_branch">branch</span><input id="n-branch" value="main"></label>
+      <label><span data-i18n="init_since">since (optional)</span><input id="n-since" placeholder="2020-01-01"></label>
+      <label><span data-i18n="init_tracker">task tracker</span><select id="n-tracker">
+        <option value="none" data-i18n="tracker_none">none — commits only</option>
+        <option value="jira">Jira</option><option value="github">GitHub</option>
+        <option value="gitlab">GitLab</option><option value="youtrack">YouTrack</option></select></label>
+    </div>
+    <div class="params trk" data-trk="jira" hidden>
+      <label><span>Jira URL</span><input id="n-jira_url" placeholder="https://issues.apache.org/jira"></label>
+      <label><span data-i18n="init_project_key">project key</span><input id="n-jira_project" placeholder="KAFKA  or  ABC,ABD,ABK"></label>
+      <label><span data-i18n="init_connector">connector</span><select id="n-jira_connector"><option value="api">api</option><option value="html">html</option><option value="selenium">selenium</option></select></label>
+      <label><span data-i18n="init_token">token (optional)</span><input id="n-jira_token" type="password" autocomplete="off"></label>
+    </div>
+    <div class="params trk" data-trk="github" hidden>
+      <label><span data-i18n="init_repo_url">repository URL</span><input id="n-gh_url" placeholder="https://github.com/<USER>/<REPO>"></label>
+      <label><span data-i18n="init_token">token (optional)</span><input id="n-gh_token" type="password" autocomplete="off"></label>
+    </div>
+    <div class="params trk" data-trk="gitlab" hidden>
+      <label><span>GitLab URL</span><input id="n-gl_url" placeholder="https://gitlab.com"></label>
+      <label><span data-i18n="init_project_path">project</span><input id="n-gl_project" placeholder="group/repo"></label>
+      <label><span data-i18n="init_token">token (optional)</span><input id="n-gl_token" type="password" autocomplete="off"></label>
+    </div>
+    <div class="params trk" data-trk="youtrack" hidden>
+      <label><span>YouTrack URL</span><input id="n-yt_url" placeholder="https://youtrack.jetbrains.com"></label>
+      <label><span data-i18n="init_project_key">project key</span><input id="n-yt_project"></label>
+      <label><span data-i18n="init_token">token (optional)</span><input id="n-yt_token" type="password" autocomplete="off"></label>
+    </div>
+    <div id="n-maskbox" hidden>
+      <h3 data-i18n="mask_t">How a commit names its task</h3>
+      <div class="row">
+        <label><span data-i18n="init_mask">commit mask</span> <input id="n-mask" list="mask-presets" style="width:230px"></label>
+        <datalist id="mask-presets"><option value="simple"><option value="bracketed"><option value="django"><option value="generic"><option value="broad"><option value="regex-key"></datalist>
+        <button id="n-try" class="small" data-i18n="mask_try">Try on the repository again</button>
+        <span id="n-mask-status" class="dim"></span>
+      </div>
+      <table class="h masks" id="n-masks"></table>
+      <p class="dim" data-i18n="mask_regex">Or a regex of your own: the first group is the task key, if there is one.</p>
+      <table class="h masks" id="n-rx"></table>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="n-overwrite"> <span data-i18n="overwrite">overwrite an existing project.yaml</span></label>
+      <button id="n-go" class="primary" data-i18n="init_btn">Write project.yaml</button><span id="n-status" class="dim"></span>
+    </div>
+    <pre id="n-out" class="out" hidden></pre>
+    <p class="help" data-i18n-html="init_help"></p>
+  </section>
+
+  <!-- INGEST -->
+  <section id="tab-ingest" class="panel">
+    <h2 data-i18n="ingest_t">Gather commits and tasks</h2>
+    <div class="row">
+      <label><span data-i18n="phase">phase</span> <select id="i-phase"><option value="both" data-i18n="phase_both">git + tasks</option><option value="git">git</option><option value="tasks" data-i18n="phase_tasks">tasks</option></select></label>
+      <label class="check"><input type="checkbox" id="i-force"> <span data-i18n="force">link every commit again</span></label>
+      <button id="i-go" class="primary" data-i18n="ingest_btn">Ingest</button><span id="i-status" class="dim"></span>
+    </div>
+    <pre id="job-log" class="log" hidden></pre>
+    <p class="help" data-i18n-html="ingest_help"></p>
+  </section>
+
+  <!-- STATUS -->
+  <section id="tab-status" class="panel">
+    <div class="row"><button id="st-go" class="primary" data-i18n="show">Show</button><span id="st-status" class="dim"></span></div>
+    <div id="st-out"></div>
+  </section>
+</main>
+<script>applyLang();</script>
+<script src="/ui/app.js"></script>
+</body>
+</html>

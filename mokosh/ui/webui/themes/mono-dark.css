@@ -1,0 +1,19 @@
+/* Monochrome Dark — pure black & white — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: dark;
+  --bg:          #0a0a0a;
+  --panel:       #1a1a1a;
+  --text:        #eeeeee;
+  --dim:         #888888;
+  --line:        #333333;
+  --accent:      #cccccc;
+  --on-accent:   #0a0a0a;
+  --accent-soft: color-mix(in oklab, #cccccc 16%, #1a1a1a);
+  --code:        color-mix(in oklab, #eeeeee 7%, #0a0a0a);
+  --pos:         #6fcf8f;
+  --neg:         #e5484d;
+  /* charts: the dark steps of the validated palette */
+  --z-evolution: #3987e5; --z-maintenance: #d95926; --z-disruption: #199e70; --z-stagnation: #c98500;
+  --k-history: #d95926; --k-code: #199e70;
+  --grid: #2c2c2a; --axis: #383835;
+}

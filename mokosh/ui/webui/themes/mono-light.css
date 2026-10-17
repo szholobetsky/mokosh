@@ -1,0 +1,19 @@
+/* Monochrome Light — pure black & white — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: light;
+  --bg:          #ffffff;
+  --panel:       #f4f4f4;
+  --text:        #111111;
+  --dim:         #666666;
+  --line:        #cccccc;
+  --accent:      #222222;
+  --on-accent:   #ffffff;
+  --accent-soft: color-mix(in oklab, #222222 16%, #f4f4f4);
+  --code:        color-mix(in oklab, #111111 7%, #ffffff);
+  --pos:         #1f7a3f;
+  --neg:         #dc2626;
+  /* charts: the light steps of the validated palette */
+  --z-evolution: #2a78d6; --z-maintenance: #eb6834; --z-disruption: #1baf7a; --z-stagnation: #eda100;
+  --k-history: #eb6834; --k-code: #1baf7a;
+  --grid: #e1e0d9; --axis: #c3c2b7;
+}

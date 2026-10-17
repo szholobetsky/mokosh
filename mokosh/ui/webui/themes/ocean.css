@@ -1,0 +1,19 @@
+/* Ocean — Oceanic Next palette — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: dark;
+  --bg:          #1B2B34;
+  --panel:       #1e3040;
+  --text:        #CDD3DE;
+  --dim:         #93a1ad;
+  --line:        #2d4454;
+  --accent:      #5FB3B3;
+  --on-accent:   #0f1e26;
+  --accent-soft: color-mix(in oklab, #5FB3B3 16%, #1e3040);
+  --code:        color-mix(in oklab, #CDD3DE 7%, #1B2B34);
+  --pos:         #6fcf8f;
+  --neg:         #e8746f;
+  /* charts: the dark steps of the validated palette */
+  --z-evolution: #3987e5; --z-maintenance: #d95926; --z-disruption: #199e70; --z-stagnation: #c98500;
+  --k-history: #d95926; --k-code: #199e70;
+  --grid: #2c2c2a; --axis: #383835;
+}

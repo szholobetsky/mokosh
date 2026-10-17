@@ -1,0 +1,19 @@
+/* Dark — GitHub Dark — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: dark;
+  --bg:          #0d1117;
+  --panel:       #161b22;
+  --text:        #e6edf3;
+  --dim:         #8b949e;
+  --line:        #30363d;
+  --accent:      #818cf8;
+  --on-accent:   #0d1117;
+  --accent-soft: color-mix(in oklab, #818cf8 16%, #161b22);
+  --code:        color-mix(in oklab, #e6edf3 7%, #0d1117);
+  --pos:         #6fcf8f;
+  --neg:         #f85149;
+  /* charts: the dark steps of the validated palette */
+  --z-evolution: #3987e5; --z-maintenance: #d95926; --z-disruption: #199e70; --z-stagnation: #c98500;
+  --k-history: #d95926; --k-code: #199e70;
+  --grid: #2c2c2a; --axis: #383835;
+}

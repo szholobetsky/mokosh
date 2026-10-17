@@ -1,0 +1,19 @@
+/* Summer — warm Mediterranean sun — the same palette as vyrii and alkonost */
+:root {
+  color-scheme: light;
+  --bg:          #FFFCF0;
+  --panel:       #FFF8E1;
+  --text:        #1A120B;
+  --dim:         #92400E;
+  --line:        #FFCC80;
+  --accent:      #C2410C;
+  --on-accent:   #ffffff;
+  --accent-soft: color-mix(in oklab, #C2410C 16%, #FFF8E1);
+  --code:        color-mix(in oklab, #1A120B 7%, #FFFCF0);
+  --pos:         #1f7a3f;
+  --neg:         #b91c1c;
+  /* charts: the light steps of the validated palette */
+  --z-evolution: #2a78d6; --z-maintenance: #eb6834; --z-disruption: #1baf7a; --z-stagnation: #eda100;
+  --k-history: #eb6834; --k-code: #1baf7a;
+  --grid: #e1e0d9; --axis: #c3c2b7;
+}
